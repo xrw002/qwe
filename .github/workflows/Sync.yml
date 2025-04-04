@@ -1,43 +1,74 @@
-name: Sync unobfuscated-worker
+name: Sync Unobfuscated Worker
+
 on:
-  push:
-    paths:
-      - 'build/unobfuscated-worker.js'  # 监视文件的变化
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 时间 0 点自动执行
+  workflow_dispatch:     # 允许手动触发
 
 jobs:
-  download_worker_file:
+  sync:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout your repository
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      # Step 2: Checkout xrw002/BPB-Worker-Panel repository
-      - name: Checkout xrw002/BPB-Worker-Panel repository
-        uses: actions/checkout@v2
+      # 步骤 1：检出当前仓库
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          repository: 'xrw002/BPB-Worker-Panel'
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 3: Verify the file exists in the cloned repo
-      - name: Verify file exists in the cloned repository
-        run: |
-          ls -l BPB-Worker-Panel/build/unobfuscated-worker.js
+      # 步骤 2：安装依赖工具
+      - name: Install jq
+        run: sudo apt-get install -y jq
 
-      # Step 4: Copy unobfuscated-worker.js to the current repo
-      - name: Copy unobfuscated-worker.js to the current repo
+      # 步骤 3：获取目标文件最新 SHA
+      - name: Get Target File SHA
+        id: get_sha
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}  # 需要创建包含 PAT 的 Secret
         run: |
-          cp BPB-Worker-Panel/build/unobfuscated-worker.js ./build/unobfuscated-worker.js
-          ls -l ./build/unobfuscated-worker.js  # Verify the file has been copied
+          API_URL="https://api.github.com/repos/xrw002/BPB-Worker-Panel/commits?path=build/unobfuscated-worker.js&per_page=1"
+          SHA=$(curl -s -H "Authorization: token $GH_TOKEN" $API_URL | jq -r '.[0].sha')
+          echo "target_sha=$SHA" >> $GITHUB_OUTPUT
 
-      # Step 5: Commit and push the updated file
-      - name: Commit and push changes
+      # 步骤 4：读取本地存储的 SHA
+      - name: Read Stored SHA
+        id: read_sha
+        run: |
+          if [ -f sha-record.txt ]; then
+            echo "stored_sha=$(cat sha-record.txt)" >> $GITHUB_OUTPUT
+          else
+            echo "stored_sha=" >> $GITHUB_OUTPUT
+          fi
+
+      # 步骤 5：比较 SHA 值
+      - name: Compare SHAs
+        id: compare
+        run: |
+          if [ "${{ steps.get_sha.outputs.target_sha }}" != "${{ steps.read_sha.outputs.stored_sha }}" ]; then
+            echo "::set-output name=changed::true"
+          else
+            echo "::set-output name=changed::false"
+          fi
+
+      # 步骤 6：下载最新文件
+      - name: Download File
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          mkdir -p build
+          curl -s -o build/unobfuscated-worker.js \
+            "https://raw.githubusercontent.com/xrw002/BPB-Worker-Panel/main/build/unobfuscated-worker.js"
+
+      # 步骤 7：更新 SHA 记录
+      - name: Update SHA Record
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          echo "${{ steps.get_sha.outputs.target_sha }}" > sha-record.txt
+
+      # 步骤 8：提交变更
+      - name: Commit Changes
+        if: steps.compare.outputs.changed == 'true'
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add build/unobfuscated-worker.js
-          git commit -m "Update unobfuscated-worker.js"
+          git add build/unobfuscated-worker.js sha-record.txt
+          git commit -m "chore: Auto-update from xrw002/BPB-Worker-Panel"
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
