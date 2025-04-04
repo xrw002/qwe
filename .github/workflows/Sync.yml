@@ -1,5 +1,4 @@
 name: Sync unobfuscated-worker
-
 on:
   push:
     paths:
@@ -10,18 +9,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      # Step 1: Checkout your repository
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      # Step 2: Download the file from the xrw002/BPB-Worker-Panel repository
-      - name: Download unobfuscated-worker.js
-        run: |
-          # 设置环境变量来使用 xrw002/BPB-Worker-Panel 仓库
-          git clone https://github.com/xrw002/BPB-Worker-Panel.git
-          cp BPB-Worker-Panel/build/unobfuscated-worker.js ./build/unobfuscated-worker.js
+      # Step 2: Checkout xrw002/BPB-Worker-Panel repository
+      - name: Checkout xrw002/BPB-Worker-Panel repository
+        uses: actions/checkout@v2
+        with:
+          repository: 'xrw002/BPB-Worker-Panel'
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 3: Commit and push the file to your repository
+      # Step 3: Verify the file exists in the cloned repo
+      - name: Verify file exists in the cloned repository
+        run: |
+          ls -l BPB-Worker-Panel/build/unobfuscated-worker.js
+
+      # Step 4: Copy unobfuscated-worker.js to the current repo
+      - name: Copy unobfuscated-worker.js to the current repo
+        run: |
+          cp BPB-Worker-Panel/build/unobfuscated-worker.js ./build/unobfuscated-worker.js
+          ls -l ./build/unobfuscated-worker.js  # Verify the file has been copied
+
+      # Step 5: Commit and push the updated file
       - name: Commit and push changes
         run: |
           git config --global user.name "GitHub Actions"
