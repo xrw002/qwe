@@ -1,0 +1,33 @@
+name: Sync unobfuscated-worker.js
+
+on:
+  push:
+    paths:
+      - 'build/unobfuscated-worker.js'  # 监视文件的变化
+
+jobs:
+  download_worker_file:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Step 2: Download the file from the xrw002/BPB-Worker-Panel repository
+      - name: Download unobfuscated-worker.js
+        run: |
+          # 设置环境变量来使用 xrw002/BPB-Worker-Panel 仓库
+          git clone https://github.com/xrw002/BPB-Worker-Panel.git
+          cp BPB-Worker-Panel/build/unobfuscated-worker.js ./build/unobfuscated-worker.js
+
+      # Step 3: Commit and push the file to your repository
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add build/unobfuscated-worker.js
+          git commit -m "Update unobfuscated-worker.js"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
