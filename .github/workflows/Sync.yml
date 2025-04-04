@@ -1,4 +1,4 @@
-name: Sync unobfuscated-worker.js
+name: Sync unobfuscated-worker
 
 on:
   push:
